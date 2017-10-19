@@ -1,4 +1,4 @@
-package zerotier
+package main
 
 import (
 	"bytes"
@@ -22,21 +22,32 @@ type Route struct {
 	Via *string `json:"via"`
 }
 
-type IPRange struct {
-	IpRangeStart string `json:"ipRangeStart"`
-	IpRangeEnd   string `json:"ipRangeEnd"`
+type IpRange struct {
+	First string `json:"ipRangeStart"`
+	Last  string `json:"ipRangeEnd"`
+}
+
+type V4AssignModeConfig struct {
+	ZT bool `json:"zt"`
 }
 
 type Config struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Private     bool   `json:"private"`
+	Name              string             `json:"name"`
+	Private           bool               `json:"private"`
+	Routes            []Route            `json:"routes"`
+	IpAssignmentPools []IpRange          `json:"ipAssignmentPools"`
+	V4AssignMode      V4AssignModeConfig `json:"v4AssignMode"`
+}
 
-	DefaultRoute *Route  `json:"-"`
-	OtherRoutes  []Route `json:"-"`
-	Routes       []Route `json:"routes,omitempty"`
+type ConfigReadOnly struct {
+	Config
 
-	IpAssignmentPools []IPRange `json:"ipAssignmentPools,omitempty"`
+	// if you include these three in a POST request, Central won't compile RulesSource for you
+	// so, we only want them when reading from the API
+	// this struct lets you do that
+	Tags         []Tag        `json:"tags"`
+	Rules        []IRule      `json:"rules"`
+	Capabilities []Capability `json:"capabilities"`
 
 	CreationTime int64 `json:"creationTime"`
 	LastModified int64 `json:"lastModified"`
@@ -44,55 +55,80 @@ type Config struct {
 }
 
 type Network struct {
-	Id          string  `json:"id,omitempty"`
+	Id          string  `json:"id"`
+	Description string  `json:"description"`
+	RulesSource string  `json:"rulesSource"`
 	Config      *Config `json:"config"`
-	RulesSource *string `json:"rulesSource,omitempty"`
 }
 
-func NetworkDefault(name string) *Network {
-	return &Network{
-		Id: "",
-		Config: &Config{
-			Name:    name,
-			Private: true,
-			Routes:  []Route{},
-		},
-	}
+type NetworkReadOnly struct {
+	Id                 string               `json:"id"`
+	Description        string               `json:"description"`
+	RulesSource        string               `json:"rulesSource"`
+	Config             *ConfigReadOnly      `json:"config"`
+	TagsByName         map[string]TagByName `json:"tagsByName"`
+	CapabilitiesByName map[string]int       `json:"capabilitiesByName"`
 }
 
-func (n *Network) SetCIDR(cidr string) error {
-	first, last, err := CIDRToRange(cidr)
-	if err != nil {
-		return err
-	}
-	n.Config.DefaultRoute = &Route{
-		Target: cidr,
-		Via:    nil,
-	}
-	n.Config.IpAssignmentPools = []IPRange{
-		IPRange{
-			IpRangeStart: first.String(),
-			IpRangeEnd:   last.String(),
-		},
-	}
+type Capability struct {
+	Id      int     `json:"id"`
+	Default bool    `json:"default"`
+	Rules   []IRule `json:"rules"`
+}
+
+type Tag struct {
+	Id      int  `json:"id"`
+	Default *int `json:"default"`
+}
+
+type IRule interface {
+	// default unmarshaljson just makes a
+	// map[string]interface{} from { type: "ACTION_DROP" } etc
+}
+
+type TagByName struct {
+	Tag
+	Enums map[string]int `json:"enums"`
+	Flags map[string]int `json:"flags"`
+}
+
+func (n *Network) Compile() error {
+	return nil
+	// compiled, err := CompileRulesSource([]byte(n.RulesSource))
+	// if err != nil {
+	// 	return err
+	// }
+	// n.Config.Rules = compiled.Config.Rules
+	// n.Config.Tags = compiled.Config.Tags
+	// n.Config.Capabilities = compiled.Config.Capabilities
+	// n.TagsByName = compiled.TagsByName
+	// n.CapabilitiesByName = compiled.CapabilitiesByName
 	return nil
 }
 
 func CIDRToRange(cidr string) (net.IP, net.IP, error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return ip, ip, err
+		return nil, nil, err
 	}
 	first := ip.Mask(ipnet.Mask)
 	last := make(net.IP, 4)
 	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
 		copy(last, ip)
 	}
+	// mirror what ZT console does
+	// there must be a reason
+	if first[3] == 0 {
+		first[3] = 1
+	}
+	if last[3] == 255 {
+		last[3] = 254
+	}
 	return first, last, nil
 
 }
 
-// modified existing net.IP
+// modifies existing net.IP
 func inc(ip net.IP) {
 	for j := len(ip) - 1; j >= 0; j-- {
 		ip[j]++
@@ -100,6 +136,22 @@ func inc(ip net.IP) {
 			break
 		}
 	}
+}
+
+// not perfect, but allocation ranges should probably always be cidrs
+func SmallestCIDR(from net.IP, to net.IP) string {
+	maxLen := 32
+	for l := maxLen; l >= 0; l-- {
+		mask := net.CIDRMask(l, maxLen)
+		na := from.Mask(mask)
+		n := net.IPNet{IP: na, Mask: mask}
+
+		if n.Contains(to) {
+			return fmt.Sprintf("%v/%v", na, l)
+		}
+	}
+	// return a string so it shows up in any CLI diffs
+	return "unable to figure out CIDR from range"
 }
 
 func (s *ZeroTierClient) doRequest(req *http.Request) ([]byte, error) {
@@ -162,26 +214,34 @@ func (client *ZeroTierClient) GetNetwork(id string) (*Network, error) {
 	return &data, nil
 }
 
-func (client *ZeroTierClient) postNetwork(id string, network *Network) error {
+func (client *ZeroTierClient) postNetwork(id string, network *Network) (*Network, error) {
 	url := fmt.Sprintf(baseUrl+"/network/%s", id)
 	j, err := json.Marshal(network)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(j))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = client.doRequest(req)
-	return err
+	bytes, err := client.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	var data Network
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
 }
 
-func (client *ZeroTierClient) CreateNetwork(network *Network) error {
+func (client *ZeroTierClient) CreateNetwork(network *Network) (*Network, error) {
 	return client.postNetwork("", network)
 }
 
-func (client *ZeroTierClient) UpdateNetwork(network *Network) error {
-	return client.postNetwork(network.Id, network)
+func (client *ZeroTierClient) UpdateNetwork(id string, network *Network) (*Network, error) {
+	return client.postNetwork(id, network)
 }
 
 func (client *ZeroTierClient) DeleteNetwork(id string) error {

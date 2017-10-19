@@ -1,0 +1,24 @@
+#
+# Allow only IPv4, IPv4 ARP, and IPv6 Ethernet frames.
+#
+drop
+	not ethertype ipv4
+	and not ethertype arp
+	and not ethertype ipv6
+;
+
+
+# otherwise don't allow opening TCP connections
+# Drop TCP SYN,!ACK packets (new connections) not explicitly whitelisted above
+break                     # break can be overridden by a capability
+  chr tcp_syn             # TCP SYN (TCP flags will never match non-TCP packets)
+  and not chr tcp_ack     # AND not TCP ACK
+;
+
+cap ssh
+  id 1000
+  accept ipprotocol tcp and dport 22;
+;
+
+accept;
+

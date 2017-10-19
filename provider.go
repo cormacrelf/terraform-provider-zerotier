@@ -1,4 +1,4 @@
-package zerotier
+package main
 
 import (
 	"github.com/hashicorp/terraform/helper/schema"
@@ -14,11 +14,13 @@ func Provider() terraform.ResourceProvider {
 				DefaultFunc: schema.EnvDefaultFunc("ZEROTIER_API_KEY", nil),
 			},
 		},
-		ResourcesMap:  map[string]*schema.Resource{},
+		ResourcesMap: map[string]*schema.Resource{
+			"zerotier_network": resourceZeroTierNetwork(),
+		},
 		ConfigureFunc: configureProvider,
 	}
 }
 
 func configureProvider(d *schema.ResourceData) (interface{}, error) {
-	return nil, nil
+	return &ZeroTierClient{ApiKey: d.Get("api_key").(string)}, nil
 }
