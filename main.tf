@@ -3,8 +3,8 @@ provider "zerotier" {
 }
 
 variable "target_cidr" { default = "10.72.0.0/18" }
-variable "cidr" { default = "10.5.1.0/24" }
-variable "gateway" { default = "10.5.1.57" }
+variable "cidr" { default = "10.5.0.0/20" }
+variable "gateway" { default = "10.5.1.1" }
 
 resource "zerotier_network" "bouncy_castle" {
   name = "bouncy_castle"
@@ -14,7 +14,7 @@ resource "zerotier_network" "bouncy_castle" {
   }
   assignment_pool {
     first = "10.5.2.2"
-    last = "10.5.3.254"
+    last = "10.5.2.254"
   }
   route {
     target = "${var.cidr}"
