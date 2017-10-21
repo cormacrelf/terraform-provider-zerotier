@@ -6,16 +6,31 @@ terraform-able activity.
 
 ## Building and Installing
 
-The easiest way to get going is to:
-
 1. Install [Go](http://www.golang.org/) on your machine, 1.9+ required
-2. Clone this repo into your `$GOPATH`, and `cd` into it. This would usually be
-   `~/go/src/github.com/cormacrelf/terraform-provider-zerotier`
-3. `go get -v` (will take a while to download `hashicorp/terraform`, so `-v` is to tell you what it's downloading).
-4. `go build -o terraform-provider-zerotier_v0.0.1`
-5. Copy the resulting executable to your terraform plugins path. See [the
-   docs](https://www.terraform.io/docs/plugins/basics.html#installing-a-plugin)
-   for where that is.
+
+2. Do the following
+
+```sh
+# it will take a while to download `hashicorp/terraform`,
+# so `-v` is to tell you what it's downloading
+
+go get -v github.com/cormacrelf/terraform-provider-zerotier
+cd ~/go/src/github.com/cormacrelf/terraform-provider-zerotier
+go build -o terraform-provider-zerotier_v0.0.1
+
+# IMPORTANT: on Windows, append `.exe` to the output name.
+```
+
+Then, copy the resulting executable to your terraform plugins path. [The
+docs](https://www.terraform.io/docs/configuration/providers.html#third-party-plugins)
+don't fully describe where this is.
+
+* On macOS 64-bit, it's `~/.terraform.d/plugins/darwin_amd64`
+* On Windows 64-bit, it's `$APPDATA\terraform.d\plugins\windows_amd64`
+* On Linux, I'm not sure.
+
+You might have to run `terraform init` with a provider block to find out where
+it's actually looking for plugins.
 
 ## Usage
 
