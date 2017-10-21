@@ -56,9 +56,9 @@ type ConfigReadOnly struct {
 
 type Network struct {
 	Id          string  `json:"id"`
-	Description string  `json:"description"`
-	RulesSource string  `json:"rulesSource"`
-	Config      *Config `json:"config"`
+	Description string  `json:"description,omitempty"`
+	RulesSource string  `json:"rulesSource,omitempty"`
+	Config      *Config `json:"config,omitempty"`
 }
 
 type NetworkReadOnly struct {
@@ -216,6 +216,8 @@ func (client *ZeroTierClient) GetNetwork(id string) (*Network, error) {
 
 func (client *ZeroTierClient) postNetwork(id string, network *Network) (*Network, error) {
 	url := fmt.Sprintf(baseUrl+"/network/%s", id)
+	// strip carriage returns?
+	// network.RulesSource = strings.Replace(network.RulesSource, "\r", "", -1)
 	j, err := json.Marshal(network)
 	if err != nil {
 		return nil, err

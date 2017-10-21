@@ -189,6 +189,7 @@ func resourceNetworkRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("description", net.Description)
 	d.Set("private", net.Config.Private)
 	d.Set("auto_assign_v4", net.Config.V4AssignMode.ZT)
+	d.Set("rules_source", net.RulesSource)
 
 	setRoutes(d, net)
 	setAssignmentPools(d, net)
@@ -231,7 +232,6 @@ func resourceNetworkUpdate(d *schema.ResourceData, m interface{}) error {
 	if err != nil {
 		stringify, _ := json.Marshal(n)
 		return fmt.Errorf("unable to update network from API: %s\n\n%s", err, stringify)
-		// return err
 	}
 	setAssignmentPools(d, updated)
 	return nil
