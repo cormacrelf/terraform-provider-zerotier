@@ -6,9 +6,11 @@ terraform-able activity.
 
 ## Building and Installing
 
-1. Install [Go](http://www.golang.org/) on your machine, 1.9+ required
+Since this isn't part of the terraform-providers organisation (yet), you have to
+install manually.
 
-2. Do the following
+Install [Go](https://www.golang.org/) on your machine, 1.9+ required. Then do
+the following:
 
 ```sh
 # it will take a while to download `hashicorp/terraform`,
@@ -176,6 +178,7 @@ ZT_NET="$2"
 # maybe install zerotier here
 
 zerotier-cli join $1
+sleep 5
 MEMBER_ID=$(zerotier-cli info | awk '{print $3}')
 echo '{"config":{"authorized":true}}' | curl -X POST -H 'Authorization: Bearer $ZT_API_KEY' -d @- \
     "https://my.zerotier.com/api/network/$ZT_NET/member/$MEMBER_ID"
@@ -202,7 +205,7 @@ to do all this. On a private subnet, it already has Internet connectivity at
 boot, but on public, it can't do anything until the eip is ready, and running
 a provisioner on the instance will delay creation of the eip.
 
-### Replace your VPN Gateway
+### Replace your VPN Gateway in an Amazon VPC
 
 If you do the above auto-join/approve, static IP assignment, and add a route to
 your VPC's CIDR via that static IP, you're almost ready to replace a VPN
