@@ -226,13 +226,6 @@ Often, and especially for joining/approving your own machine automatically, you 
 }
 ```
 
-Note that if you're provisioning inside a VPC's _public_ subnet, you will likely
-need to put the provisioner blocks on a `resource "aws_eip"` instead (with
-`host` specified), so that the instance has Internet connectivity when it tries
-to do all this. On a private subnet, it already has Internet connectivity at
-boot, but on public, it can't do anything until the eip is ready, and running
-a provisioner on the instance will delay creation of the eip.
-
 #### Joining your local machine automatically
 
 The same principle of supplying an API key and calling the `my.zerotier.com`
