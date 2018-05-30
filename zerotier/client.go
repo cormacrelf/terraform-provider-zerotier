@@ -103,7 +103,7 @@ func (n *Network) Compile() error {
 	// n.Config.Capabilities = compiled.Config.Capabilities
 	// n.TagsByName = compiled.TagsByName
 	// n.CapabilitiesByName = compiled.CapabilitiesByName
-	return nil
+	// return nil
 }
 
 func CIDRToRange(cidr string) (net.IP, net.IP, error) {
