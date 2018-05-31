@@ -60,9 +60,9 @@ In PowerShell, running as Administrator:
 ```powershell
 choco install golang
 choco install dep
-# if you don't have these already
 choco install zip
 choco install git # for git-bash
+choco install make
 ```
 
 In a shell that has Make, like Git-Bash:
