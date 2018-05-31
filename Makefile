@@ -3,16 +3,49 @@
 GOFMT_FILES?=$$(find . -name '*.go' | grep -v vendor)
 VETARGS?=-all
 TEST?=$$(go list ./...)
+ifeq ($(OS),Windows_NT)
+	UNAME := Windows
+else
+	UNAME := $(shell uname -s)
+endif
+os := noos
+ifeq ($(UNAME),Windows)
+	os := windows
+endif
+ifeq ($(UNAME),Darwin)
+	os := mac
+endif
+ifeq ($(UNAME),Linux)
+	os := linux
+endif
 
+TAG := $(shell git describe --abbrev=0)
 
 all: build
 
 build: mac windows linux
 
-dev: clean fmt mac copy
+install: $(os) copy-$(os)
 
-copy:
-	tar -xvf bin/terraform-provider-zerotier_darwin-amd64.tgz && mv bin/terraform-provider-zerotier $(shell dirname `which terraform`)
+dev: clean fmt install
+
+copy-mac:
+	rm -f bin/terraform-provider-zerotier
+	mkdir -p "${HOME}/.terraform.d/plugins/darwin_amd64"
+	tar -xvf bin/terraform-provider-zerotier_darwin-amd64_$(TAG).tgz && \
+		mv bin/terraform-provider-zerotier_$(TAG) "${HOME}/.terraform.d/plugins/darwin_amd64/"
+
+copy-linux:
+	rm -f bin/terraform-provider-zerotier
+	mkdir -p "${HOME}/.terraform.d/plugins/linux_amd64"
+	tar -xvf bin/terraform-provider-zerotier_darwin-amd64_$(TAG).tgz && \
+		mv bin/terraform-provider-zerotier_$(TAG) "${HOME}/.terraform.d/plugins/linux_amd64/"
+
+copy-windows:
+	rm -f bin/terraform-provider-zerotier
+	mkdir -p "${APPDATA}/terraform.d/plugins/windows_amd64"
+	unzip bin/terraform-provider-zerotier_windows-amd64_$(TAG).zip && \
+		mv bin/terraform-provider-zerotier_$(TAG).exe "${APPDATA}/terraform.d/plugins/windows_amd64/"
 
 test: vet fmtcheck errcheck
 	TF_ACC=1 go test -v ./zerotier -run=TestAcczerotier -timeout=180m -parallel=4
@@ -40,16 +73,21 @@ clean:
 	rm -rf bin/*
 
 mac:
-	GOOS=darwin GOARCH=amd64 go build -o bin/terraform-provider-zerotier ./zerotier
-	tar czvf bin/terraform-provider-zerotier_darwin-amd64.tgz bin/terraform-provider-zerotier
-	rm -rf bin/terraform-provider-zerotier
+	GOOS=darwin GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG) ./zerotier
+	tar czvf bin/terraform-provider-zerotier_darwin-amd64_$(TAG).tgz bin/terraform-provider-zerotier_$(TAG)
+	rm -rf bin/terraform-provider-zerotier_$(TAG)
 
 windows:
-	GOOS=windows GOARCH=amd64 go build -o bin/terraform-provider-zerotier.exe ./zerotier
-	tar czvf bin/terraform-provider-zerotier_windows-amd64.tgz bin/terraform-provider-zerotier.exe
-	rm -rf bin/terraform-provider-zerotier.exe
+	GOOS=windows GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG).exe ./zerotier
+	zip bin/terraform-provider-zerotier_windows-amd64_$(TAG).zip bin/terraform-provider-zerotier_$(TAG).exe
+	rm -rf bin/terraform-provider-zerotier_$(TAG).exe
 
 linux:
-	GOOS=linux GOARCH=amd64 go build -o bin/terraform-provider-zerotier ./zerotier
-	tar czvf bin/terraform-provider-zerotier_linux-amd64.tgz bin/terraform-provider-zerotier
-	rm -rf bin/terraform-provider-zerotier
+	GOOS=linux GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG) ./zerotier
+	tar czvf bin/terraform-provider-zerotier_linux-amd64_$(TAG).tgz bin/terraform-provider-zerotier_$(TAG)
+	rm -rf bin/terraform-provider-zerotier_$(TAG)
+
+noos:
+	@echo "your OS was not detected"
+
+copy-noos:
