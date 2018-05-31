@@ -154,7 +154,7 @@ func SmallestCIDR(from net.IP, to net.IP) string {
 	return "unable to figure out CIDR from range"
 }
 
-func (s *ZeroTierClient) doRequest(req *http.Request) ([]byte, error) {
+func (s *ZeroTierClient) doRequest(reqName string, req *http.Request) ([]byte, error) {
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", s.ApiKey))
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -166,8 +166,11 @@ func (s *ZeroTierClient) doRequest(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if 200 != resp.StatusCode {
-		return nil, fmt.Errorf("%s", body)
+	if resp.StatusCode == 403 {
+		return nil, fmt.Errorf("%s received a %s response. Check your ZEROTIER_API_KEY.", reqName, resp.Status)
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("%s received response: %s", reqName, body)
 	}
 	return body, nil
 }
@@ -189,11 +192,16 @@ func (client *ZeroTierClient) CheckNetworkExists(id string) (bool, error) {
 		return false, err
 	}
 	resp, err := client.headRequest(req)
-	if err != nil {
-		return false, err
+	if resp.StatusCode == 404 {
+		return false, nil
 	}
-
-	return resp.StatusCode == 200, nil
+	if resp.StatusCode == 403 {
+		return false, fmt.Errorf("CheckNetworkExists received a %s response. Check your ZEROTIER_API_KEY.", resp.Status)
+	}
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("CheckNetworkExists received response: %s", resp.Status)
+	}
+	return true, err
 }
 
 func (client *ZeroTierClient) GetNetwork(id string) (*Network, error) {
@@ -202,7 +210,7 @@ func (client *ZeroTierClient) GetNetwork(id string) (*Network, error) {
 	if err != nil {
 		return nil, err
 	}
-	bytes, err := client.doRequest(req)
+	bytes, err := client.doRequest("GetNetwork", req)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +234,13 @@ func (client *ZeroTierClient) postNetwork(id string, network *Network) (*Network
 	if err != nil {
 		return nil, err
 	}
-	bytes, err := client.doRequest(req)
+	var reqName string
+	if id == "" {
+		reqName = "CreateNetwork"
+	} else {
+		reqName = "UpdateNetwork"
+	}
+	bytes, err := client.doRequest(reqName, req)
 	if err != nil {
 		return nil, err
 	}
@@ -252,6 +266,6 @@ func (client *ZeroTierClient) DeleteNetwork(id string) error {
 	if err != nil {
 		return err
 	}
-	_, err = client.doRequest(req)
+	_, err = client.doRequest("DeleteNetwork", req)
 	return err
 }
