@@ -92,18 +92,31 @@ type TagByName struct {
 	Flags map[string]int `json:"flags"`
 }
 
-func (n *Network) Compile() error {
-	return nil
-	// compiled, err := CompileRulesSource([]byte(n.RulesSource))
-	// if err != nil {
-	// 	return err
-	// }
-	// n.Config.Rules = compiled.Config.Rules
-	// n.Config.Tags = compiled.Config.Tags
-	// n.Config.Capabilities = compiled.Config.Capabilities
-	// n.TagsByName = compiled.TagsByName
-	// n.CapabilitiesByName = compiled.CapabilitiesByName
-	// return nil
+type Member struct {
+	Id                 string        `json:"id"`
+	NetworkId          string        `json:"networkId"`
+	NodeId             string        `json:"nodeId"`
+	OfflineNotifyDelay int           `json:"offlineNotifyDelay"` // milliseconds
+	Name               string        `json:"name"`
+	Description        string        `json:"description"`
+	Hidden             bool          `json:"hidden"`
+	Config             *MemberConfig `json:"config"`
+}
+type MemberConfig struct {
+	Authorized      bool     `json:"authorized"`
+	Capabilities    []int    `json:"capabilities"`
+	Tags            [][]int  `json:"tags"` // array of [tag id, value] tuples
+	ActiveBridge    bool     `json:"activeBridge"`
+	NoAutoAssignIps bool     `json:"noAutoAssignIps"`
+	IpAssignments   []string `json:"ipAssignments"`
+}
+type MemberConfigReadOnly struct {
+	CreationTime       int `json:"creationTime"`
+	LastAuthorizedTime int `json:"lastAuthorizedTime"`
+	VMajor             int `json:"vMajor"`
+	VMinor             int `json:"vMinor"`
+	VRev               int `json:"vRev"`
+	VProto             int `json:"vProto"`
 }
 
 func CIDRToRange(cidr string) (net.IP, net.IP, error) {
@@ -268,4 +281,87 @@ func (client *ZeroTierClient) DeleteNetwork(id string) error {
 	}
 	_, err = client.doRequest("DeleteNetwork", req)
 	return err
+}
+
+/////////////
+// members //
+/////////////
+
+func (client *ZeroTierClient) GetMember(nwid string, nodeId string) (*Member, error) {
+	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", nwid, nodeId)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := client.doRequest("GetMember", req)
+	if err != nil {
+		return nil, err
+	}
+	var data Member
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (client *ZeroTierClient) postMember(member *Member, reqName string) (*Member, error) {
+	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", member.NetworkId, member.NodeId)
+	j, err := json.Marshal(member)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(j))
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := client.doRequest(reqName, req)
+	if err != nil {
+		return nil, err
+	}
+	var data Member
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (client *ZeroTierClient) CreateMember(member *Member) (*Member, error) {
+	return client.postMember(member, "CreateMember")
+}
+
+func (client *ZeroTierClient) UpdateMember(member *Member) (*Member, error) {
+	return client.postMember(member, "UpdateMember")
+}
+
+// Careful: this one isn't documented in the Zt API,
+// but this is what the Central web client does.
+func (client *ZeroTierClient) DeleteMember(member *Member) error {
+	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", member.NetworkId, member.NodeId)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	_, err = client.doRequest("DeleteMember", req)
+	return err
+}
+
+func (client *ZeroTierClient) CheckMemberExists(nwid string, nodeId string) (bool, error) {
+	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", nwid, nodeId)
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := client.headRequest(req)
+	if resp.StatusCode == 404 {
+		return false, nil
+	}
+	if resp.StatusCode == 403 {
+		return false, fmt.Errorf("CheckMemberExists received a %s response. Check your ZEROTIER_API_KEY.", resp.Status)
+	}
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("CheckMemberExists received response: %s", resp.Status)
+	}
+	return true, err
 }

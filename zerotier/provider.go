@@ -16,6 +16,7 @@ func Provider() terraform.ResourceProvider {
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"zerotier_network": resourceZeroTierNetwork(),
+			"zerotier_member":  resourceZeroTierMember(),
 		},
 		ConfigureFunc: configureProvider,
 	}

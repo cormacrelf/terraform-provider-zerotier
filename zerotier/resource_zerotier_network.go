@@ -149,9 +149,6 @@ func fromResourceData(d *schema.ResourceData) (*Network, error) {
 			IpAssignmentPools: pools,
 		},
 	}
-	if err := n.Compile(); err != nil {
-		return nil, err
-	}
 	return n, nil
 }
 
@@ -232,7 +229,7 @@ func resourceNetworkUpdate(d *schema.ResourceData, m interface{}) error {
 	updated, err := client.UpdateNetwork(d.Id(), n)
 	if err != nil {
 		stringify, _ := json.Marshal(n)
-		return fmt.Errorf("unable to update network from API: %s\n\n%s", err, stringify)
+		return fmt.Errorf("unable to update network using ZeroTier API: %s\n\n%s", err, stringify)
 	}
 	setAssignmentPools(d, updated)
 	return nil

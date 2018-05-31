@@ -179,7 +179,7 @@ resource "zerotier_network" "your_network" {
     route {
         target = "${var.zt_cidr}"
     }
-    rules_source = "${file(ztr.conf)}"
+    rules_source = "${file("ztr.conf")}"
 }
 ```
 
