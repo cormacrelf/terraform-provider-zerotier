@@ -7,33 +7,77 @@ terraform-able activity.
 ## Building and Installing
 
 Since this isn't part of the terraform-providers organisation (yet), you have to
-install manually.
+install manually. There are two main ways:
 
-Install [Go](https://www.golang.org/) on your machine, 1.9+ required. Then do
-the following:
+### Download a release
 
-```sh
-# it will take a while to download `hashicorp/terraform`. be patient.
+Download and unzip the [latest
+release](https://github.com/cormacrelf/terraform-provider-zerotier/releases/latest).
 
-go get -v github.com/cormacrelf/terraform-provider-zerotier
-cd ~/go/src/github.com/cormacrelf/terraform-provider-zerotier
-go build -o terraform-provider-zerotier_v0.0.1
-
-# IMPORTANT: on Windows, append `.exe` to the output name.
-```
-
-Then, copy the resulting executable to your terraform plugins path. [The
+Then, move it to your terraform plugins directory. [The
 docs](https://www.terraform.io/docs/configuration/providers.html#third-party-plugins)
 don't fully describe where this is.
 
-* On macOS 64-bit, it's `~/.terraform.d/plugins/darwin_amd64`
-* On Windows 64-bit, it's `$APPDATA\terraform.d\plugins\windows_amd64`
-* On Linux, I'm not sure.
+* On macOS, it's `~/.terraform.d/plugins/darwin_amd64`
+* On Linux, it's `~/.terraform.d/plugins/linux_amd64`
+* On Windows, it's `$APPDATA\terraform.d\plugins\windows_amd64`
 
-You might have to run `terraform init` with a provider block to find out where
-it's actually looking for plugins.
+### Build using the Makefile
+
+Install [Go](https://www.golang.org/) v1.9+ on your machine, and
+[dep](https://golang.github.io/dep/docs/installation.html); clone the source,
+and let `make install` do the rest.
+
+#### Mac
+
+```sh
+brew install go  # or upgrade
+brew install dep # or upgrade
+mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
+git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+cd terraform-provider-zerotier
+make install
+# it may take a while to download `hashicorp/terraform`. be patient.
+```
+
+#### Linux
+
+Install go and dep from your favourite package manager or from source. Then:
+
+```sh
+mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
+git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+cd terraform-provider-zerotier
+make install
+# it may take a while to download `hashicorp/terraform`. be patient.
+```
+
+#### Windows
+
+In PowerShell, running as Administrator:
+
+```powershell
+choco install golang
+choco install dep
+# if you don't have these already
+choco install zip
+choco install git # for git-bash
+```
+
+In a shell that has Make, like Git-Bash:
+
+```sh
+mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
+git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+cd terraform-provider-zerotier
+make install
+# it may take a while to download `hashicorp/terraform`. be patient.
+```
 
 ## Usage
+
+Before you can use a new provider, you must run `terraform init` in your
+project, where the root `.tf` file is.
 
 ### API Key
 

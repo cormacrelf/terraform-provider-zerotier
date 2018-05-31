@@ -19,9 +19,25 @@ ifeq ($(UNAME),Linux)
 	os := linux
 endif
 
-TAG := $(shell git describe --abbrev=0)
+TAG := ${TRAVIS_TAG}
+ifndef TAG
+	TAG := $(shell git describe --abbrev=0)
+endif
+
+HASDEP := $(shell command -v dep 2> /dev/null)
+HASGO := $(shell command -v go 2> /dev/null)
+HASZIP := $(shell command -v zip 2> /dev/null)
 
 all: build
+
+dep:
+ifndef HASGO
+	$(error "go is not available. Please install Go v1.9+")
+endif
+ifndef HASDEP
+	$(error "dep is not available. Please install https://golang.github.io/dep/docs/installation.html")
+endif
+	dep ensure
 
 build: mac windows linux
 
@@ -72,17 +88,20 @@ errcheck:
 clean:
 	rm -rf bin/*
 
-mac:
+mac: dep
 	GOOS=darwin GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG) ./zerotier
 	tar czvf bin/terraform-provider-zerotier_darwin-amd64_$(TAG).tgz bin/terraform-provider-zerotier_$(TAG)
 	rm -rf bin/terraform-provider-zerotier_$(TAG)
 
-windows:
+windows: dep
+ifndef HASZIP
+	$(error "zip is not available. If you're on windows, try `choco install zip`")
+endif
 	GOOS=windows GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG).exe ./zerotier
 	zip bin/terraform-provider-zerotier_windows-amd64_$(TAG).zip bin/terraform-provider-zerotier_$(TAG).exe
 	rm -rf bin/terraform-provider-zerotier_$(TAG).exe
 
-linux:
+linux: dep
 	GOOS=linux GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG) ./zerotier
 	tar czvf bin/terraform-provider-zerotier_linux-amd64_$(TAG).tgz bin/terraform-provider-zerotier_$(TAG)
 	rm -rf bin/terraform-provider-zerotier_$(TAG)
