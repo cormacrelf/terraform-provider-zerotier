@@ -23,3 +23,4 @@ deploy:
     on:
       repo: cormacrelf/terraform-provider-zerotier
       tags: true
+      all_branches: true
