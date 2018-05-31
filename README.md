@@ -343,7 +343,7 @@ Note the `sudo`. `join.sh` is like the following:
 ZT_API_KEY="$1"
 ZT_NET="$2"
 
-# use gpg2 instead on Ubuntu, basically follow this guide
+# basically follow this guide
 # https://www.zerotier.com/download.shtml
 curl -s 'https://pgp.mit.edu/pks/lookup?op=get&search=0x1657198823E52A61' | gpg --import && \
 if z=$(curl -s 'https://install.zerotier.com/' | gpg); then echo "$z" | sudo bash; fi
