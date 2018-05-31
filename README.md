@@ -2,25 +2,24 @@
 
 [![Build Status](https://travis-ci.org/cormacrelf/terraform-provider-zerotier.svg?branch=master)](https://travis-ci.org/cormacrelf/terraform-provider-zerotier)
 
-This lets you create, modify and destroy [ZeroTier](https://zerotier.com) networks through Terraform.
-Nothing fancy yet, like adding members, but the networks are the bulk of
-terraform-able activity.
+This lets you create, modify and destroy [ZeroTier](https://zerotier.com)
+networks and members through Terraform.
 
 ## Building and Installing
 
-Since this isn't part of the terraform-providers organisation (yet), you have to
-install manually. There are two main ways:
+Since this isn't maintained by Hashicorp, you have to install it manually. There
+are two main ways:
 
 ### Download a release
 
 Download and unzip the [latest
 release](https://github.com/cormacrelf/terraform-provider-zerotier/releases/latest).
 
-Then, move it to your terraform plugins directory. [The
+Then, move the binary to your terraform plugins directory. [The
 docs](https://www.terraform.io/docs/configuration/providers.html#third-party-plugins)
 don't fully describe where this is.
 
-* On macOS, it's `~/.terraform.d/plugins/darwin_amd64`
+* On Mac, it's `~/.terraform.d/plugins/darwin_amd64`
 * On Linux, it's `~/.terraform.d/plugins/linux_amd64`
 * On Windows, it's `$APPDATA\terraform.d\plugins\windows_amd64`
 
@@ -91,10 +90,11 @@ provider "zerotier" {
 }
 ```
 
-### Network resource
+### Networks
 
-There is only one resource, `"zerotier_network"`. To achieve a similar
-configuration to the Zerotier default, do this:
+#### Network resource
+
+To achieve a similar configuration to the ZeroTier default, do this:
 
 ```hcl
 variable "zt_cidr" { default = "10.0.96.0/24" }
@@ -115,7 +115,7 @@ resource "zerotier_network" "your_network" {
 If you don't specify either an assignment pool or a managed route, while it's
 perfectly valid, your network won't be very useful, so try to do both.
 
-### Multiple routes
+#### Multiple routes
 
 You can have more than one assignment pool, and more than one route. Multiple
 routes are useful for connecting two networks together, like so:
@@ -147,7 +147,7 @@ resource "zerotier_network" "your_network" {
 Then go ahead and make an API call on your gateway's provisioner to set the IP
 address manually. See below (auto-joining). 
 
-### Rules
+#### Rules
 
 Best of all, you can specify rules just like in the web interface. You could even use a Terraform `template_file` to insert variables.
 
@@ -156,10 +156,7 @@ Best of all, you can specify rules just like in the web interface. You could eve
 
 # drop non-v4/v6/arp traffic
 drop not ethertype ipv4 and not ethertype arp and not ethertype ipv6;
-
-# disallow tcp connections except by specific grant in a capability
-break chr tcp_syn and not chr tcp_ack;
-
+# disallow tcp connections except by specific grant in a capability break chr tcp_syn and not chr tcp_ack; 
 # allow ssh from some devices
 cap ssh
     id 1000
@@ -183,19 +180,130 @@ resource "zerotier_network" "your_network" {
 }
 ```
 
-### Auto-joining and auto-approving instances
+### Members and joining
+
+Unfortunately, it is not possible for a machine to be added to a network without
+the machine itself reaching out to ZeroTier.
+
+However, you can pre-approve a machine if you already know its Node ID. This is
+**not** the case for dynamically created machines like cloud instances. It is
+more useful for your developer machine, which you might want to give a bunch of
+capabilities and pre-approve so that when you do paste a network ID in, you
+don't have to use the web UI to do the rest.
+
+#### Member resource
+
+Basic example to pre-approve:
+
+```hcl
+resource "zerotier_member" "dev_machine" {
+  node_id = "..."
+  network_id = "${zerotier_network.net.id}"
+  name = "dev machine"
+}
+```
+
+Full list of properties:
+
+```hcl
+resource "zerotier_member" "hector" {
+  # required: the known id that a particular machine shows
+  # (e.g. in the Mac menu bar app, or the Windows tray, Linux CLI output)
+  node_id                 = "a1511e5bf5"
+  # required: the network id
+  network_id              = "${zerotier_network.net.id}"
+
+  # the rest are optional
+
+  name                    = "hector"
+  description             = "..."
+  authorized              = true
+  # whether to show it in the list in the Web UI
+  hidden                  = false
+
+
+  # e.g.
+  # cap administrator
+  #   id 1000
+  #   accept;
+  # ;
+  capabilities = [ 1000 ]
+
+  # e.g.
+  # tag department
+  #   id 2000
+  #   enum 100 marketing
+  #   enum 200 accounting
+  # ;
+  tags = {
+    "2000" = 100 # marketing
+  }
+
+  # default (false) means this member has a managed IP address automatically assigned.
+  # without ip_assignments being configured, the member won't have any managed IPs.
+  no_auto_assign_ips      = false
+  # will happily override any auto-assigned v4 addresses (and v6 in some configurations)
+  ip_assignments = [
+    "10.0.96.15"
+  ]
+
+  # not known whether this does anything or not
+  offline_notify_delay    = 0
+  # see ZeroTier Manual section on L2/ethernet bridging
+  allow_ethernet_bridging = true
+
+}
+```
+
+#### Joining your development machine automatically
+
+Things are simple when you already know your Node ID. A `local-exec` provisioner
+can be used to execute `sudo zerotier-cli join [nwid]` when a network is
+created, which will be auto-approved using a `zerotier_member` resource. You
+will have to type your password (once) during `terraform apply`, or you will
+have to apply as root already.
+
+The provisioner should be defined on a `null_resource` that is triggered when
+the network ID changes. That way you can re-join by marking the null resource as
+deleted, without deleting the entire network.
+
+If you had another machine nearby (like a CI box), you could also run `join` on
+it using SSH or similar. Or just accept the one-off menial task.
+
+```hcl
+resource "zerotier_network" "net" { ... }
+resource "zerotier_member" "dev_machine" {
+  network_id = "${zerotier_network.net.id}"
+  node_id = "... (see above)"
+  name = "dev machine"
+  capabilities = [ 1000, 2000 ]
+}
+resource "null_resource" "joiner" {
+  triggers {
+    network_id = "${zerotier_network.net.id}"
+  }
+  provisioner "local-exec" {
+    command = "sudo zerotier-cli join ${zerotier_network.net.id}"
+  }
+}
+```
+
+#### Auto-joining and auto-approving dynamic instances
 
 Using `zerotier-cli join XXX` doesn't require an API key, but that member won't
-be approved by default. The solution is to pass in the key to a provisioner and
-use the ZeroTier API to do it from the instance itself. This is the basic
-pattern, and applies whether you're using Terraform provisioners, running Docker
-entrypoint scripts with environment variables, running a container on
-Kubernetes.
+be approved by default. On the other hand, the `zerotier_member` resource cannot
+force a machine to join, it can only (pre-)approve and (pre-)configure membership of
+a machine whose Node ID is already known. This is not true of a dynamically
+created instance on a cloud provider.
+
+The solution is to pass in the key to a provisioner and use the ZeroTier REST
+API directly to do it from the instance itself. This is the basic pattern, and
+applies whether you're using Terraform provisioners, running Docker entrypoint
+scripts with environment variables, or running Ansible scripts (etc).
 
 Any way you do it, you will need to have your ZT API key accessible to Terraform.
 Provide the environment variable `export TF_VAR_zerotier_api_key="..."` so you
-can access the key outside the provider definition, and do something like this
-(simplified and probably needs work):
+can access the key outside the provider definition, and do something like this:
 
 ```hcl
 variable "zerotier_api_key" {}
@@ -207,10 +315,10 @@ resource "zerotier_network" "example" {
 }
 ```
 
-You might then insert `"${var.zerotier_api_key}"` into a
-[`kubernetes_secret`][k8s_secret] resource, or an
-[`aws_ssm_parameter`][ssm_param]. To use a standard Terraform provisioner, do
-this:
+You might then insert `"${var.zerotier_api_key}"` into
+a [`kubernetes_secret`][k8s_secret] resource, or an
+[`aws_ssm_parameter`][ssm_param], or directly into a provisioner as a script
+argument. To use a standard Terraform provisioner, do this:
 
 [k8s_secret]: https://www.terraform.io/docs/providers/kubernetes/r/secret.html
 [ssm_param]:  https://www.terraform.io/docs/providers/aws/r/ssm_parameter.html
@@ -234,70 +342,35 @@ Note the `sudo`. `join.sh` is like the following:
 ```sh
 ZT_API_KEY="$1"
 ZT_NET="$2"
-# maybe install zerotier here
 
-zerotier-cli join $1
+# use gpg2 instead on Ubuntu, basically follow this guide
+# https://www.zerotier.com/download.shtml
+curl -s 'https://pgp.mit.edu/pks/lookup?op=get&search=0x1657198823E52A61' | gpg --import && \
+if z=$(curl -s 'https://install.zerotier.com/' | gpg); then echo "$z" | sudo bash; fi
+
+zerotier-cli join "$ZT_NET"
 sleep 5
-MEMBER_ID=$(zerotier-cli info | awk '{print $3}')
+NODE_ID=$(zerotier-cli info | awk '{print $3}')
 echo '{"config":{"authorized":true}}' | curl -X POST -H 'Authorization: Bearer $ZT_API_KEY' -d @- \
-    "https://my.zerotier.com/api/network/$ZT_NET/member/$MEMBER_ID"
+    "https://my.zerotier.com/api/network/$ZT_NET/member/$NODE_ID"
 ```
 
-You could even set a static IP there, by POSTing the following instead. This
-is useful if you want the instance to act as a gateway with a known IP, like
-in the multiple routes example above.
+You could even set a static IP there, by POSTing the following instead. This is
+useful if you want the instance to act as a gateway with a known IP, like in the
+multiple routes example above. Or any field from the [ZeroTier API
+Reference][zt-api] listing for `POST /api/network/{networkId}/member/{nodeId}`.
+
+[zt-api]: https://my.zerotier.com/help/api
 
 ```json
 {
     "name": "a-single-tear",
     "config": {
         "authorized": true,
-        "ipAssignments": ["10.96.0.1"]
-    }
-}
-```
-
-Often, and especially for joining/approving your own machine automatically, you might want to add some capabilities or tags. Refer to the [ZeroTier API Reference][zt-api] for more details on `POST /api/network/{networkId}/member/{nodeId}`.
-
-[zt-api]: https://my.zerotier.com/help/api
-
-```json
-{
-    "name": "dev-machine",
-    "config": {
-        "authorized": true,
+        "ipAssignments": ["10.96.0.1"],
         "capabilities": [ 1000, 2000 ],
-        "tags": [ 1000 ]
+        "tags": [ [2000, 100] ]
     }
-}
-```
-
-#### Joining your local machine automatically
-
-The same principle of supplying an API key and calling the `my.zerotier.com`
-API applies even if you're running a `local-exec` provisioner to have your
-developer machine auto-connect. You will have to run `terraform apply` as
-root/admin. This is a flaw; you don't really want to be running an elevated
-shell all the time. So, don't try fancy `data "external"` tricks to
-automatically re-join your machine if not already, because that would require
-root on every `terraform plan`.
-
-Instead, the provisioner should be defined on the network resource or on a
-`null_resource` that depends on it. That way, you only need to run as admin
-the first time. The script to run is essentially the same as above for a
-cloud instance.
-
-```hcl
-resource "zerotier_network" "net" { ... }
-resource "null_resource" "joiner" {
-  triggers {
-    network_id = "${zerotier_network.net.id}"
-  }
-  provisioner "local-exec" {
-    command = "sudo sh ./join.sh ${var.zt_api_key} ${zerotier_network.net.id} ${var.zt_computer_name}"
-    # windows
-    # command = "powershell -c .\\join.ps1 -apikey ${var.zt_api_key} -nwid ${zerotier_network.net.id} -name ${var.zt_computer_name}"
-  }
 }
 ```
 
