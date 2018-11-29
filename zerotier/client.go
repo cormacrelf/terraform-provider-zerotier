@@ -201,7 +201,7 @@ func (s *ZeroTierClient) headRequest(req *http.Request) (*http.Response, error) 
 
 func (client *ZeroTierClient) CheckNetworkExists(id string) (bool, error) {
 	url := fmt.Sprintf(baseUrl+"/network/%s", id)
-	req, err := http.NewRequest("HEAD", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false, err
 	}
@@ -350,7 +350,7 @@ func (client *ZeroTierClient) DeleteMember(member *Member) error {
 
 func (client *ZeroTierClient) CheckMemberExists(nwid string, nodeId string) (bool, error) {
 	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", nwid, nodeId)
-	req, err := http.NewRequest("HEAD", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false, err
 	}
