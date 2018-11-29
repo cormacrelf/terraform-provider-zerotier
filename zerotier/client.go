@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"strings"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -236,7 +237,7 @@ func (client *ZeroTierClient) GetNetwork(id string) (*Network, error) {
 }
 
 func (client *ZeroTierClient) postNetwork(id string, network *Network) (*Network, error) {
-	url := fmt.Sprintf(baseUrl+"/network/%s", id)
+	url := strings.TrimSuffix(fmt.Sprintf(baseUrl+"/network/%s", id), "/")
 	// strip carriage returns?
 	// network.RulesSource = strings.Replace(network.RulesSource, "\r", "", -1)
 	j, err := json.Marshal(network)
