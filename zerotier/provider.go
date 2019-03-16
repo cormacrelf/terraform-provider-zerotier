@@ -1,4 +1,4 @@
-package main
+package zerotier
 
 import (
 	"github.com/hashicorp/terraform/helper/schema"

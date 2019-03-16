@@ -25,17 +25,14 @@ don't fully describe where this is.
 
 ### Build using the Makefile
 
-Install [Go](https://www.golang.org/) v1.9+ on your machine, and
-[dep](https://golang.github.io/dep/docs/installation.html); clone the source,
+Install [Go](https://www.golang.org/) v1.12+ on your machine, clone the source,
 and let `make install` do the rest.
 
 #### Mac
 
 ```sh
 brew install go  # or upgrade
-brew install dep # or upgrade
-mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
-git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+git clone https://github.com/cormacrelf/terraform-provider-zerotier
 cd terraform-provider-zerotier
 make install
 # it may take a while to download `hashicorp/terraform`. be patient.
@@ -43,11 +40,10 @@ make install
 
 #### Linux
 
-Install go and dep from your favourite package manager or from source. Then:
+Install go 1.12+ from your favourite package manager or from source. Then:
 
 ```sh
-mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
-git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+git clone https://github.com/cormacrelf/terraform-provider-zerotier
 cd terraform-provider-zerotier
 make install
 # it may take a while to download `hashicorp/terraform`. be patient.
@@ -59,7 +55,6 @@ In PowerShell, running as Administrator:
 
 ```powershell
 choco install golang
-choco install dep
 choco install zip
 choco install git # for git-bash
 choco install make
@@ -68,8 +63,7 @@ choco install make
 In a shell that has Make, like Git-Bash:
 
 ```sh
-mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
-git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+git clone https://github.com/cormacrelf/terraform-provider-zerotier
 cd terraform-provider-zerotier
 make install
 # it may take a while to download `hashicorp/terraform`. be patient.
