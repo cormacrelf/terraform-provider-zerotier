@@ -34,6 +34,9 @@ func resourceZeroTierNetwork() *schema.Resource {
 		Update: resourceNetworkUpdate,
 		Delete: resourceNetworkDelete,
 		Exists: resourceNetworkExists,
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{

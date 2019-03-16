@@ -3,6 +3,7 @@ package zerotier
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
 )
@@ -14,6 +15,9 @@ func resourceZeroTierMember() *schema.Resource {
 		Update: resourceMemberUpdate,
 		Delete: resourceMemberDelete,
 		Exists: resourceMemberExists,
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"network_id": {
@@ -172,12 +176,28 @@ func memberFromResourceData(d *schema.ResourceData) (*Member, error) {
 	}
 	return n, nil
 }
+
+// Extracts the Network ID and Node ID from the resource definition, or from the id during import
+//
+// When importing a resource, both the network id and node id writen on the definition will be ignored
+// and we could retrieve the network id and node id from parts of the id
+// which is formated as <network-id>-<node-id> on zerotier
+func resourceNetworkAndNodeIdentifiers(d *schema.ResourceData) (string, string) {
+	nwid := d.Get("network_id").(string)
+	nodeID := d.Get("node_id").(string)
+
+	if nwid == "" && nodeID == "" {
+		parts := strings.Split(d.Id(), "-")
+		nwid, nodeID = parts[0], parts[1]
+	}
+	return nwid, nodeID
+}
+
 func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 	client := m.(*ZeroTierClient)
 
 	// Attempt to read from an upstream API
-	nwid := d.Get("network_id").(string)
-	nodeId := d.Get("node_id").(string)
+	nwid, nodeId := resourceNetworkAndNodeIdentifiers(d)
 	member, err := client.GetMember(nwid, nodeId)
 
 	// If the resource does not exist, inform Terraform. We want to immediately
@@ -193,6 +213,8 @@ func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 	d.SetId(member.Id)
 	d.Set("name", member.Name)
 	d.Set("description", member.Description)
+	d.Set("node_id", nodeId)
+	d.Set("network_id", nwid)
 	d.Set("hidden", member.Hidden)
 	d.Set("offline_notify_delay", member.OfflineNotifyDelay)
 	d.Set("authorized", member.Config.Authorized)
@@ -207,8 +229,7 @@ func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 
 func resourceMemberExists(d *schema.ResourceData, m interface{}) (b bool, e error) {
 	client := m.(*ZeroTierClient)
-	nwid := d.Get("network_id").(string)
-	nodeId := d.Get("node_id").(string)
+	nwid, nodeId := resourceNetworkAndNodeIdentifiers(d)
 	exists, err := client.CheckMemberExists(nwid, nodeId)
 	if err != nil {
 		return exists, err
