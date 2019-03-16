@@ -536,3 +536,41 @@ Any other ec2 instances you want to access from your ZT network will need:
 
 * Ingress from your **gateway's security group** for whatever ports you want
 * Egress either everywhere or to gateway
+
+## Resource Importing
+
+Terraform [is able to import](https://www.terraform.io/docs/import/index.html) existing infrastructure.
+This allows you take resources you've created by some other means and bring it under Terraform management.
+
+It is possible to import both networks and members state using this provider.
+Currently, Terraform features can only import the state information, and you still need to write the resource definition before it is able to import.
+
+Given the following definition:
+
+```hcl
+provider "zerotier" {
+  api_key = "..."
+}
+
+resource "zerotier_network" "your_network" {
+    name = "your_network_name"
+}
+
+resource "zerotier_member" "dev_machine" {
+  node_id = "..."
+  network_id = "${zerotier_network.your_network.id}"
+}
+```
+
+You be able to import both the `network` and the `member` resources using the `terraform import` command.
+
+```sh
+## Resource is identified by the network id by the API
+terraform import zerotier_network.your_network ${NETWORK_ID}
+
+## Resource is identified by the network id and the node id by the API
+terraform import zerotier_member.dev_machine "${NETWORK_ID}-${NODE_ID}"
+
+## Adjust the configuration until no change is planned
+terraform plan
+```
