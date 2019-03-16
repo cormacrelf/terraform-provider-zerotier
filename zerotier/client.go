@@ -10,10 +10,9 @@ import (
 	"strings"
 )
 
-const baseUrl string = "https://my.zerotier.com/api"
-
 type ZeroTierClient struct {
-	ApiKey string
+	ApiKey     string
+	Controller string
 }
 
 type Route struct {
@@ -200,7 +199,7 @@ func (s *ZeroTierClient) headRequest(req *http.Request) (*http.Response, error) 
 }
 
 func (client *ZeroTierClient) CheckNetworkExists(id string) (bool, error) {
-	url := fmt.Sprintf(baseUrl+"/network/%s", id)
+	url := fmt.Sprintf(client.Controller+"/network/%s", id)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false, err
@@ -219,7 +218,7 @@ func (client *ZeroTierClient) CheckNetworkExists(id string) (bool, error) {
 }
 
 func (client *ZeroTierClient) GetNetwork(id string) (*Network, error) {
-	url := fmt.Sprintf(baseUrl+"/network/%s", id)
+	url := fmt.Sprintf(client.Controller+"/network/%s", id)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -237,7 +236,7 @@ func (client *ZeroTierClient) GetNetwork(id string) (*Network, error) {
 }
 
 func (client *ZeroTierClient) postNetwork(id string, network *Network) (*Network, error) {
-	url := strings.TrimSuffix(fmt.Sprintf(baseUrl+"/network/%s", id), "/")
+	url := strings.TrimSuffix(fmt.Sprintf(client.Controller+"/network/%s", id), "/")
 	// strip carriage returns?
 	// network.RulesSource = strings.Replace(network.RulesSource, "\r", "", -1)
 	j, err := json.Marshal(network)
@@ -275,7 +274,7 @@ func (client *ZeroTierClient) UpdateNetwork(id string, network *Network) (*Netwo
 }
 
 func (client *ZeroTierClient) DeleteNetwork(id string) error {
-	url := fmt.Sprintf(baseUrl+"/network/%s", id)
+	url := fmt.Sprintf(client.Controller+"/network/%s", id)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return err
@@ -289,7 +288,7 @@ func (client *ZeroTierClient) DeleteNetwork(id string) error {
 /////////////
 
 func (client *ZeroTierClient) GetMember(nwid string, nodeId string) (*Member, error) {
-	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", nwid, nodeId)
+	url := fmt.Sprintf(client.Controller+"/network/%s/member/%s", nwid, nodeId)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -307,7 +306,7 @@ func (client *ZeroTierClient) GetMember(nwid string, nodeId string) (*Member, er
 }
 
 func (client *ZeroTierClient) postMember(member *Member, reqName string) (*Member, error) {
-	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", member.NetworkId, member.NodeId)
+	url := fmt.Sprintf(client.Controller+"/network/%s/member/%s", member.NetworkId, member.NodeId)
 	j, err := json.Marshal(member)
 	if err != nil {
 		return nil, err
@@ -339,7 +338,7 @@ func (client *ZeroTierClient) UpdateMember(member *Member) (*Member, error) {
 // Careful: this one isn't documented in the Zt API,
 // but this is what the Central web client does.
 func (client *ZeroTierClient) DeleteMember(member *Member) error {
-	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", member.NetworkId, member.NodeId)
+	url := fmt.Sprintf(client.Controller+"/network/%s/member/%s", member.NetworkId, member.NodeId)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return err
@@ -349,7 +348,7 @@ func (client *ZeroTierClient) DeleteMember(member *Member) error {
 }
 
 func (client *ZeroTierClient) CheckMemberExists(nwid string, nodeId string) (bool, error) {
-	url := fmt.Sprintf(baseUrl+"/network/%s/member/%s", nwid, nodeId)
+	url := fmt.Sprintf(client.Controller+"/network/%s/member/%s", nwid, nodeId)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false, err
