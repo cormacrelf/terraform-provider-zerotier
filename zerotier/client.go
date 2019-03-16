@@ -1,13 +1,13 @@
-package main
+package zerotier
 
 import (
 	"bytes"
-	"strings"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 )
 
 const baseUrl string = "https://my.zerotier.com/api"
