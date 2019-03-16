@@ -81,6 +81,11 @@ Use `export ZEROTIER_API_KEY="..."`, or define it in a provider block:
 ```hcl
 provider "zerotier" {
   api_key = "..."
+  
+  ## Optinal: Override for DIY controller
+  ## Could be overriden by ZEROTIER_CONTROLLER_URL env var or this block
+  ## Defaults to https://my.zerotier.com/api when not provided
+  # controller_url = "https://my.zerotier.com/api"
 }
 ```
 
