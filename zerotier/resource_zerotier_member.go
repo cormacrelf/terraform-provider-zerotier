@@ -3,6 +3,7 @@ package zerotier
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
 )
@@ -61,8 +62,25 @@ func resourceZeroTierMember() *schema.Resource {
 				Default:  false,
 			},
 			"ip_assignments": {
-				Type:     schema.TypeList,
-				Optional: true,
+				Type:        schema.TypeSet,
+				Description: "List of IP routed and assigned by ZeroTier controller assignment pool. Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided.",
+				Optional:    true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"ipv4_assignments": {
+				Type:        schema.TypeSet,
+				Description: "Computed list of IPv4 assigned by ZeroTier controller assignment pool.",
+				Computed:    true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"ipv6_assignments": {
+				Type:        schema.TypeSet,
+				Description: "Computed list of IPv6 assigned by ZeroTier controller assignment pool. Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided.",
+				Computed:    true,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
@@ -148,7 +166,7 @@ func memberFromResourceData(d *schema.ResourceData) (*Member, error) {
 	for i := range capsRaw {
 		caps[i] = capsRaw[i].(int)
 	}
-	ipsRaw := d.Get("ip_assignments").([]interface{})
+	ipsRaw := d.Get("ip_assignments").(*schema.Set).List()
 	ips := make([]string, len(ipsRaw))
 	for i := range ipsRaw {
 		ips[i] = ipsRaw[i].(string)
@@ -172,6 +190,20 @@ func memberFromResourceData(d *schema.ResourceData) (*Member, error) {
 	}
 	return n, nil
 }
+
+// Split the list of assigned IPs into IPv6 and IPv4 lists
+// Does not include 6PLANE or RFC4193, only those from the assignment pool
+func assingnedIpsGrouping(ipAssignments []string) (ipv4s []string, ipv6s []string) {
+	for _, element := range ipAssignments {
+		if strings.Contains(element, ":") {
+			ipv6s = append(ipv6s, element)
+		} else {
+			ipv4s = append(ipv4s, element)
+		}
+	}
+	return
+}
+
 func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 	client := m.(*ZeroTierClient)
 
@@ -190,6 +222,8 @@ func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 		return nil
 	}
 
+	ipv4Assignments, ipv6Assignments := assingnedIpsGrouping(member.Config.IpAssignments)
+
 	d.SetId(member.Id)
 	d.Set("name", member.Name)
 	d.Set("description", member.Description)
@@ -199,6 +233,8 @@ func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("allow_ethernet_bridging", member.Config.ActiveBridge)
 	d.Set("no_auto_assign_ips", member.Config.NoAutoAssignIps)
 	d.Set("ip_assignments", member.Config.IpAssignments)
+	d.Set("ipv4_assignments", ipv4Assignments)
+	d.Set("ipv6_assignments", ipv6Assignments)
 	d.Set("capabilities", member.Config.Capabilities)
 	setTags(d, member)
 

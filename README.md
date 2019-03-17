@@ -246,6 +246,12 @@ resource "zerotier_member" "hector" {
   # see ZeroTier Manual section on L2/ethernet bridging
   allow_ethernet_bridging = true
 
+  # Computed properties
+
+  # ipv4_assignments: Computed list of IPv4 assigned by ZeroTier controller assignment pool
+  # ipv6_assignments: Computed list of IPv6 assigned by ZeroTier controller assignment pool.
+  # Note: Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided, similar to ip_assignments.
+
 }
 ```
 
