@@ -63,7 +63,7 @@ func resourceZeroTierNetwork() *schema.Resource {
 				Default:  true,
 			},
 			"route": &schema.Schema{
-				Type:     schema.TypeList,
+				Type:     schema.TypeSet,
 				Optional: true,
 				Elem:     route(),
 			},
@@ -113,7 +113,7 @@ func resourceNetworkExists(d *schema.ResourceData, m interface{}) (b bool, e err
 }
 
 func fromResourceData(d *schema.ResourceData) (*Network, error) {
-	routesRaw := d.Get("route").([]interface{})
+	routesRaw := d.Get("route").(*schema.Set).List()
 	var routes []Route
 	for _, raw := range routesRaw {
 		r := raw.(map[string]interface{})
