@@ -35,6 +35,8 @@ type V4AssignModeConfig struct {
 type Config struct {
 	Name              string             `json:"name"`
 	Private           bool               `json:"private"`
+	EnableBroadcast   bool               `json:"enableBroadcast"`
+	MulticastLimit    int                `json:"multicastLimit"`
 	Routes            []Route            `json:"routes"`
 	IpAssignmentPools []IpRange          `json:"ipAssignmentPools"`
 	V4AssignMode      V4AssignModeConfig `json:"v4AssignMode"`
