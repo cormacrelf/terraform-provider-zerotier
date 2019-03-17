@@ -38,12 +38,12 @@ func isValidControllerURL(i interface{}, k string) ([]string, []error) {
 func Provider() terraform.ResourceProvider {
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
-			"api_key": &schema.Schema{
+			"api_key": {
 				Type:        schema.TypeString,
 				Required:    true,
 				DefaultFunc: schema.EnvDefaultFunc("ZEROTIER_API_KEY", nil),
 			},
-			"controller_url": &schema.Schema{
+			"controller_url": {
 				Type:         schema.TypeString,
 				Required:     true,
 				DefaultFunc:  schema.EnvDefaultFunc("ZEROTIER_CONTROLLER_URL", "https://my.zerotier.com/api"),

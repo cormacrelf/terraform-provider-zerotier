@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Check gofmt
+# Check errcheck
 echo "==> Checking for unchecked errors..."
 
 if ! which errcheck >/dev/null; then

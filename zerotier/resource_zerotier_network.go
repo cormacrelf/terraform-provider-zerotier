@@ -14,15 +14,37 @@ import (
 func route() *schema.Resource {
 	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
-			"target": &schema.Schema{
+			"target": {
 				Type:             schema.TypeString,
 				Required:         true,
 				DiffSuppressFunc: diffSuppress,
 			},
-			"via": &schema.Schema{
+			"via": {
 				Type:             schema.TypeString,
 				Optional:         true,
 				DiffSuppressFunc: diffSuppress,
+			},
+		},
+	}
+}
+
+func assignmentPool() *schema.Resource {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"cidr": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"assignment_pool.first", "assignment_pool.last"},
+			},
+			"first": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"assignment_pool.cidr"},
+			},
+			"last": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"assignment_pool.cidr"},
 			},
 		},
 	}
@@ -40,92 +62,74 @@ func resourceZeroTierNetwork() *schema.Resource {
 		},
 
 		Schema: map[string]*schema.Schema{
-			"name": &schema.Schema{
+			"name": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"description": &schema.Schema{
+			"description": {
 				Type:     schema.TypeString,
 				Optional: true,
 				Default:  "Managed by Terraform",
 			},
-			"rules_source": &schema.Schema{
+			"rules_source": {
 				Type:     schema.TypeString,
 				Optional: true,
 				// pulled from ZT's default
 				Default: "#\n# Allow only IPv4, IPv4 ARP, and IPv6 Ethernet frames.\n#\ndrop\n\tnot ethertype ipv4\n\tand not ethertype arp\n\tand not ethertype ipv6\n;\n\n#\n# Uncomment to drop non-ZeroTier issued and managed IP addresses.\n#\n# This prevents IP spoofing but also blocks manual IP management at the OS level and\n# bridging unless special rules to exempt certain hosts or traffic are added before\n# this rule.\n#\n#drop\n#\tnot chr ipauth\n#;\n\n# Accept anything else. This is required since default is 'drop'.\naccept;",
 				Set:     stringHash,
 			},
-			"private": &schema.Schema{
+			"private": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
 			},
-			"auto_assign_v4": &schema.Schema{
+			"auto_assign_v4": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
 			},
-			"auto_assign_v6": &schema.Schema{
+			"auto_assign_v6": {
 				Type:        schema.TypeBool,
 				Description: "Auto assign IPv6 to members from ZeroTier assignment pool",
 				Optional:    true,
 				Default:     false,
 			},
-			"auto_assign_6plane": &schema.Schema{
+			"auto_assign_6plane": {
 				Type:        schema.TypeBool,
 				Description: "Auto assign IPv6 /60 to members using 6PLANE adressing",
 				Optional:    true,
 				Default:     false,
 			},
-			"auto_assign_rfc4193": &schema.Schema{
+			"auto_assign_rfc4193": {
 				Type:        schema.TypeBool,
 				Description: "Auto assign IPv6 /128 to members using RFC4193 adressing",
 				Optional:    true,
 				Default:     true,
 			},
 			//Warning: Undecoumented on the API, but that is how the UI manages it
-			"broadcast": &schema.Schema{
+			"broadcast": {
 				Type:        schema.TypeBool,
 				Description: "Enable network broadcast (ff:ff:ff:ff:ff:ff)",
 				Optional:    true,
 				Default:     true,
 			},
-			"multicast_limit": &schema.Schema{
+			"multicast_limit": {
 				Type:         schema.TypeInt,
 				Description:  "The maximum number of recipients that can receive an Ethernet multicast or broadcast. Setting to 0 disables multicast, but be aware that only IPv6 with NDP emulation (RFC4193 or 6PLANE addressing modes) or other unicast-only protocols will work without multicast.",
 				Optional:     true,
 				Default:      32,
 				ValidateFunc: validation.IntAtLeast(0),
 			},
-			"route": &schema.Schema{
+			"route": {
 				Type:     schema.TypeSet,
 				Optional: true,
 				Elem:     route(),
 			},
-			"assignment_pool": &schema.Schema{
+			"assignment_pool": {
 				Type:     schema.TypeSet,
 				Optional: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"cidr": &schema.Schema{
-							Type:          schema.TypeString,
-							Optional:      true,
-							ConflictsWith: []string{"assignment_pool.first", "assignment_pool.last"},
-						},
-						"first": &schema.Schema{
-							Type:          schema.TypeString,
-							Optional:      true,
-							ConflictsWith: []string{"assignment_pool.cidr"},
-						},
-						"last": &schema.Schema{
-							Type:          schema.TypeString,
-							Optional:      true,
-							ConflictsWith: []string{"assignment_pool.cidr"},
-						},
-					},
-				},
-				Set: resourceIpAssignmentHash,
+				Elem:     assignmentPool(),
+				Set:      resourceIpAssignmentHash,
 			},
 		},
 	}

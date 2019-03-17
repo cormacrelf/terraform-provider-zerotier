@@ -65,7 +65,7 @@ vet:
 	fi
 
 fmt:
-	gofmt -w .
+	gofmt -s -w .
 	goimports -w .
 
 fmtcheck:
