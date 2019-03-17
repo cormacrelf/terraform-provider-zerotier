@@ -83,7 +83,7 @@ func resourceZeroTierMember() *schema.Resource {
 				Computed:    true,
 			},
 			"capabilities": {
-				Type:     schema.TypeList,
+				Type:     schema.TypeSet,
 				Optional: true,
 				Elem: &schema.Schema{
 					Type: schema.TypeInt,
@@ -158,7 +158,7 @@ func memberFromResourceData(d *schema.ResourceData) (*Member, error) {
 		}
 		tagTuples = append(tagTuples, []int{i, val.(int)})
 	}
-	capsRaw := d.Get("capabilities").([]interface{})
+	capsRaw := d.Get("capabilities").(*schema.Set).List()
 	caps := make([]int, len(capsRaw))
 	for i := range capsRaw {
 		caps[i] = capsRaw[i].(int)
