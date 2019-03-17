@@ -65,6 +65,24 @@ func resourceZeroTierNetwork() *schema.Resource {
 				Optional: true,
 				Default:  true,
 			},
+			"auto_assign_v6": &schema.Schema{
+				Type:        schema.TypeBool,
+				Description: "Auto assign IPv6 to members from ZeroTier assignment pool",
+				Optional:    true,
+				Default:     false,
+			},
+			"auto_assign_6plane": &schema.Schema{
+				Type:        schema.TypeBool,
+				Description: "Auto assign IPv6 /60 to members using 6PLANE adressing",
+				Optional:    true,
+				Default:     false,
+			},
+			"auto_assign_rfc4193": &schema.Schema{
+				Type:        schema.TypeBool,
+				Description: "Auto assign IPv6 /128 to members using RFC4193 adressing",
+				Optional:    true,
+				Default:     true,
+			},
 			"route": &schema.Schema{
 				Type:     schema.TypeList,
 				Optional: true,
@@ -145,9 +163,16 @@ func fromResourceData(d *schema.ResourceData) (*Network, error) {
 		RulesSource: d.Get("rules_source").(string),
 		Description: d.Get("description").(string),
 		Config: &Config{
-			Name:              d.Get("name").(string),
-			Private:           d.Get("private").(bool),
-			V4AssignMode:      V4AssignModeConfig{ZT: true},
+			Name:    d.Get("name").(string),
+			Private: d.Get("private").(bool),
+			V4AssignMode: V4AssignModeConfig{
+				ZT: d.Get("auto_assign_v4").(bool),
+			},
+			V6AssignMode: V6AssignModeConfig{
+				ZT:       d.Get("auto_assign_v6").(bool),
+				SixPLANE: d.Get("auto_assign_6plane").(bool),
+				RFC4193:  d.Get("auto_assign_rfc4193").(bool),
+			},
 			Routes:            routes,
 			IpAssignmentPools: pools,
 		},
@@ -190,6 +215,9 @@ func resourceNetworkRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("description", net.Description)
 	d.Set("private", net.Config.Private)
 	d.Set("auto_assign_v4", net.Config.V4AssignMode.ZT)
+	d.Set("auto_assign_v6", net.Config.V6AssignMode.ZT)
+	d.Set("auto_assign_6plane", net.Config.V6AssignMode.SixPLANE)
+	d.Set("auto_assign_rfc4193", net.Config.V6AssignMode.RFC4193)
 	d.Set("rules_source", net.RulesSource)
 
 	setRoutes(d, net)

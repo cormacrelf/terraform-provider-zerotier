@@ -114,6 +114,53 @@ resource "zerotier_network" "your_network" {
 If you don't specify either an assignment pool or a managed route, while it's
 perfectly valid, your network won't be very useful, so try to do both.
 
+Full list of properties:
+
+```hcl
+resource "zerotier_network" "your_network" {
+    name = "your_network_name"
+
+    # Optional values
+    # description = "Managed by Terraform"
+    # rules_source = "Default rule pulled from ZeroTier"
+
+    # private = true
+
+    # Assign IPv4 addresses from the assignment_pool
+    # auto_assign_v4 = true
+
+    # Effectively assign IPv6 RFC4193 (/128) for members of the network
+    # auto_assign_rfc4193 = true
+
+    # Effectively assign IPv6 RFC4193 (/128) for members of the network
+    # auto_assign_6plane = false
+
+    # Assing IPv6 addresses from the assignment_pool
+    # auto_assign_v6 = false
+
+    # Multiple assignment pools allowed
+    # assignment_pool {
+    #     cidr = "IPv4 or IPv6 CIDR notation"
+    # }
+    # assignment_pool {
+    #     first  = "IPv4 or IPv6 address" # eg 10.96.0.2
+    #     last   = "IPv4 or IPv6 address" # eg 10.96.0.254
+    # }
+
+    # Multiple routes configuration allowed
+    # route {
+    #     target = "${var.zt_cidr}"
+    # }
+    # route {
+    #     target = "${var.other_network}"
+    #     via    = "${local.gateway_ip}"
+    # }
+
+    # Computed
+    # id: Network ID
+}
+```
+
 #### Multiple routes
 
 You can have more than one assignment pool, and more than one route. Multiple
@@ -250,6 +297,16 @@ resource "zerotier_member" "hector" {
   offline_notify_delay    = 0
   # see ZeroTier Manual section on L2/ethernet bridging
   allow_ethernet_bridging = true
+
+  # Computed properties available to interpolate
+
+  # rfc4193_address
+  # Computed RFC4193 (IPv6 /128) address based on the network and node id
+  # Always calculated, and determined if they are used by the network resource
+
+  # 6plane_address
+  # Computed 6PLANE (IPv6 /80) address based on the network and node id
+  # Always calculated, and determined if they are used by the network resource
 
 }
 ```
