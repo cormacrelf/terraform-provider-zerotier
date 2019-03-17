@@ -25,17 +25,14 @@ don't fully describe where this is.
 
 ### Build using the Makefile
 
-Install [Go](https://www.golang.org/) v1.9+ on your machine, and
-[dep](https://golang.github.io/dep/docs/installation.html); clone the source,
+Install [Go](https://www.golang.org/) v1.12+ on your machine, clone the source,
 and let `make install` do the rest.
 
 #### Mac
 
 ```sh
 brew install go  # or upgrade
-brew install dep # or upgrade
-mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
-git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+git clone https://github.com/cormacrelf/terraform-provider-zerotier
 cd terraform-provider-zerotier
 make install
 # it may take a while to download `hashicorp/terraform`. be patient.
@@ -43,11 +40,10 @@ make install
 
 #### Linux
 
-Install go and dep from your favourite package manager or from source. Then:
+Install go 1.12+ from your favourite package manager or from source. Then:
 
 ```sh
-mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
-git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+git clone https://github.com/cormacrelf/terraform-provider-zerotier
 cd terraform-provider-zerotier
 make install
 # it may take a while to download `hashicorp/terraform`. be patient.
@@ -59,7 +55,6 @@ In PowerShell, running as Administrator:
 
 ```powershell
 choco install golang
-choco install dep
 choco install zip
 choco install git # for git-bash
 choco install make
@@ -68,8 +63,7 @@ choco install make
 In a shell that has Make, like Git-Bash:
 
 ```sh
-mkdir -p $GOPATH/src/github.com/cormacrelf; cd $GOPATH/src/github.com/cormacrelf
-git clone https://github.com/cormacrelf/terraform-provider-zerotier 
+git clone https://github.com/cormacrelf/terraform-provider-zerotier
 cd terraform-provider-zerotier
 make install
 # it may take a while to download `hashicorp/terraform`. be patient.
@@ -87,6 +81,11 @@ Use `export ZEROTIER_API_KEY="..."`, or define it in a provider block:
 ```hcl
 provider "zerotier" {
   api_key = "..."
+  
+  ## Optinal: Override for DIY controller
+  ## Could be overriden by ZEROTIER_CONTROLLER_URL env var or this block
+  ## Defaults to https://my.zerotier.com/api when not provided
+  # controller_url = "https://my.zerotier.com/api"
 }
 ```
 
@@ -114,6 +113,53 @@ resource "zerotier_network" "your_network" {
 
 If you don't specify either an assignment pool or a managed route, while it's
 perfectly valid, your network won't be very useful, so try to do both.
+
+Full list of properties:
+
+```hcl
+resource "zerotier_network" "your_network" {
+    name = "your_network_name"
+
+    # Optional values
+    # description = "Managed by Terraform"
+    # rules_source = "Default rule pulled from ZeroTier"
+
+    # private = true
+
+    # Assign IPv4 addresses from the assignment_pool
+    # auto_assign_v4 = true
+
+    # Effectively assign IPv6 RFC4193 (/128) for members of the network
+    # auto_assign_rfc4193 = true
+
+    # Effectively assign IPv6 RFC4193 (/128) for members of the network
+    # auto_assign_6plane = false
+
+    # Assing IPv6 addresses from the assignment_pool
+    # auto_assign_v6 = false
+
+    # Multiple assignment pools allowed
+    # assignment_pool {
+    #     cidr = "IPv4 or IPv6 CIDR notation"
+    # }
+    # assignment_pool {
+    #     first  = "IPv4 or IPv6 address" # eg 10.96.0.2
+    #     last   = "IPv4 or IPv6 address" # eg 10.96.0.254
+    # }
+
+    # Multiple routes configuration allowed
+    # route {
+    #     target = "${var.zt_cidr}"
+    # }
+    # route {
+    #     target = "${var.other_network}"
+    #     via    = "${local.gateway_ip}"
+    # }
+
+    # Computed
+    # id: Network ID
+}
+```
 
 #### Multiple routes
 
@@ -251,6 +297,16 @@ resource "zerotier_member" "hector" {
   offline_notify_delay    = 0
   # see ZeroTier Manual section on L2/ethernet bridging
   allow_ethernet_bridging = true
+
+  # Computed properties available to interpolate
+
+  # rfc4193_address
+  # Computed RFC4193 (IPv6 /128) address based on the network and node id
+  # Always calculated, and determined if they are used by the network resource
+
+  # 6plane_address
+  # Computed 6PLANE (IPv6 /80) address based on the network and node id
+  # Always calculated, and determined if they are used by the network resource
 
 }
 ```
@@ -542,3 +598,41 @@ Any other ec2 instances you want to access from your ZT network will need:
 
 * Ingress from your **gateway's security group** for whatever ports you want
 * Egress either everywhere or to gateway
+
+## Resource Importing
+
+Terraform [is able to import](https://www.terraform.io/docs/import/index.html) existing infrastructure.
+This allows you take resources you've created by some other means and bring it under Terraform management.
+
+It is possible to import both networks and members state using this provider.
+Currently, Terraform features can only import the state information, and you still need to write the resource definition before it is able to import.
+
+Given the following definition:
+
+```hcl
+provider "zerotier" {
+  api_key = "..."
+}
+
+resource "zerotier_network" "your_network" {
+    name = "your_network_name"
+}
+
+resource "zerotier_member" "dev_machine" {
+  node_id = "..."
+  network_id = "${zerotier_network.your_network.id}"
+}
+```
+
+You be able to import both the `network` and the `member` resources using the `terraform import` command.
+
+```sh
+## Resource is identified by the network id by the API
+terraform import zerotier_network.your_network ${NETWORK_ID}
+
+## Resource is identified by the network id and the node id by the API
+terraform import zerotier_member.dev_machine "${NETWORK_ID}-${NODE_ID}"
+
+## Adjust the configuration until no change is planned
+terraform plan
+```

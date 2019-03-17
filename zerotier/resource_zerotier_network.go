@@ -1,4 +1,4 @@
-package main
+package zerotier
 
 import (
 	"bytes"
@@ -8,20 +8,43 @@ import (
 
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform/helper/validation"
 )
 
 func route() *schema.Resource {
 	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
-			"target": &schema.Schema{
+			"target": {
 				Type:             schema.TypeString,
 				Required:         true,
 				DiffSuppressFunc: diffSuppress,
 			},
-			"via": &schema.Schema{
+			"via": {
 				Type:             schema.TypeString,
 				Optional:         true,
 				DiffSuppressFunc: diffSuppress,
+			},
+		},
+	}
+}
+
+func assignmentPool() *schema.Resource {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"cidr": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"assignment_pool.first", "assignment_pool.last"},
+			},
+			"first": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"assignment_pool.cidr"},
+			},
+			"last": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"assignment_pool.cidr"},
 			},
 		},
 	}
@@ -34,62 +57,79 @@ func resourceZeroTierNetwork() *schema.Resource {
 		Update: resourceNetworkUpdate,
 		Delete: resourceNetworkDelete,
 		Exists: resourceNetworkExists,
+		Importer: &schema.ResourceImporter{
+			State: schema.ImportStatePassthrough,
+		},
 
 		Schema: map[string]*schema.Schema{
-			"name": &schema.Schema{
+			"name": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"description": &schema.Schema{
+			"description": {
 				Type:     schema.TypeString,
 				Optional: true,
 				Default:  "Managed by Terraform",
 			},
-			"rules_source": &schema.Schema{
+			"rules_source": {
 				Type:     schema.TypeString,
 				Optional: true,
 				// pulled from ZT's default
 				Default: "#\n# Allow only IPv4, IPv4 ARP, and IPv6 Ethernet frames.\n#\ndrop\n\tnot ethertype ipv4\n\tand not ethertype arp\n\tand not ethertype ipv6\n;\n\n#\n# Uncomment to drop non-ZeroTier issued and managed IP addresses.\n#\n# This prevents IP spoofing but also blocks manual IP management at the OS level and\n# bridging unless special rules to exempt certain hosts or traffic are added before\n# this rule.\n#\n#drop\n#\tnot chr ipauth\n#;\n\n# Accept anything else. This is required since default is 'drop'.\naccept;",
 				Set:     stringHash,
 			},
-			"private": &schema.Schema{
+			"private": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
 			},
-			"auto_assign_v4": &schema.Schema{
+			"auto_assign_v4": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
 			},
-			"route": &schema.Schema{
-				Type:     schema.TypeList,
+			"auto_assign_v6": {
+				Type:        schema.TypeBool,
+				Description: "Auto assign IPv6 to members from ZeroTier assignment pool",
+				Optional:    true,
+				Default:     false,
+			},
+			"auto_assign_6plane": {
+				Type:        schema.TypeBool,
+				Description: "Auto assign IPv6 /60 to members using 6PLANE adressing",
+				Optional:    true,
+				Default:     false,
+			},
+			"auto_assign_rfc4193": {
+				Type:        schema.TypeBool,
+				Description: "Auto assign IPv6 /128 to members using RFC4193 adressing",
+				Optional:    true,
+				Default:     true,
+			},
+			//Warning: Undecoumented on the API, but that is how the UI manages it
+			"broadcast": {
+				Type:        schema.TypeBool,
+				Description: "Enable network broadcast (ff:ff:ff:ff:ff:ff)",
+				Optional:    true,
+				Default:     true,
+			},
+			"multicast_limit": {
+				Type:         schema.TypeInt,
+				Description:  "The maximum number of recipients that can receive an Ethernet multicast or broadcast. Setting to 0 disables multicast, but be aware that only IPv6 with NDP emulation (RFC4193 or 6PLANE addressing modes) or other unicast-only protocols will work without multicast.",
+				Optional:     true,
+				Default:      32,
+				ValidateFunc: validation.IntAtLeast(0),
+			},
+			"route": {
+				Type:     schema.TypeSet,
 				Optional: true,
 				Elem:     route(),
 			},
-			"assignment_pool": &schema.Schema{
+			"assignment_pool": {
 				Type:     schema.TypeSet,
 				Optional: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"cidr": &schema.Schema{
-							Type:          schema.TypeString,
-							Optional:      true,
-							ConflictsWith: []string{"assignment_pool.first", "assignment_pool.last"},
-						},
-						"first": &schema.Schema{
-							Type:          schema.TypeString,
-							Optional:      true,
-							ConflictsWith: []string{"assignment_pool.cidr"},
-						},
-						"last": &schema.Schema{
-							Type:          schema.TypeString,
-							Optional:      true,
-							ConflictsWith: []string{"assignment_pool.cidr"},
-						},
-					},
-				},
-				Set: resourceIpAssignmentHash,
+				Elem:     assignmentPool(),
+				Set:      resourceIpAssignmentHash,
 			},
 		},
 	}
@@ -113,7 +153,7 @@ func resourceNetworkExists(d *schema.ResourceData, m interface{}) (b bool, e err
 }
 
 func fromResourceData(d *schema.ResourceData) (*Network, error) {
-	routesRaw := d.Get("route").([]interface{})
+	routesRaw := d.Get("route").(*schema.Set).List()
 	var routes []Route
 	for _, raw := range routesRaw {
 		r := raw.(map[string]interface{})
@@ -142,9 +182,18 @@ func fromResourceData(d *schema.ResourceData) (*Network, error) {
 		RulesSource: d.Get("rules_source").(string),
 		Description: d.Get("description").(string),
 		Config: &Config{
-			Name:              d.Get("name").(string),
-			Private:           d.Get("private").(bool),
-			V4AssignMode:      V4AssignModeConfig{ZT: true},
+			Name:            d.Get("name").(string),
+			Private:         d.Get("private").(bool),
+			EnableBroadcast: d.Get("broadcast").(bool),
+			MulticastLimit:  d.Get("multicast_limit").(int),
+			V4AssignMode: V4AssignModeConfig{
+				ZT: d.Get("auto_assign_v4").(bool),
+			},
+			V6AssignMode: V6AssignModeConfig{
+				ZT:       d.Get("auto_assign_v6").(bool),
+				SixPLANE: d.Get("auto_assign_6plane").(bool),
+				RFC4193:  d.Get("auto_assign_rfc4193").(bool),
+			},
 			Routes:            routes,
 			IpAssignmentPools: pools,
 		},
@@ -186,7 +235,12 @@ func resourceNetworkRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("name", net.Config.Name)
 	d.Set("description", net.Description)
 	d.Set("private", net.Config.Private)
+	d.Set("broadcast", net.Config.EnableBroadcast)
+	d.Set("multicast_limit", net.Config.MulticastLimit)
 	d.Set("auto_assign_v4", net.Config.V4AssignMode.ZT)
+	d.Set("auto_assign_v6", net.Config.V6AssignMode.ZT)
+	d.Set("auto_assign_6plane", net.Config.V6AssignMode.SixPLANE)
+	d.Set("auto_assign_rfc4193", net.Config.V6AssignMode.RFC4193)
 	d.Set("rules_source", net.RulesSource)
 
 	setRoutes(d, net)

@@ -1,6 +1,5 @@
 # Adapted from https://github.com/alibaba/terraform-provider/blob/master/Makefile
 
-GOFMT_FILES?=$$(find . -name '*.go' | grep -v vendor)
 VETARGS?=-all
 TEST?=$$(go list ./...)
 ifeq ($(OS),Windows_NT)
@@ -24,26 +23,16 @@ ifndef TAG
 	TAG := $(shell git describe --abbrev=0)
 endif
 
-HASDEP := $(shell command -v dep 2> /dev/null)
-HASGO := $(shell command -v go 2> /dev/null)
 HASZIP := $(shell command -v zip 2> /dev/null)
 
 all: build
-
-dep:
-ifndef HASGO
-	$(error "go is not available. Please install Go v1.9+")
-endif
-ifndef HASDEP
-	$(error "dep is not available. Please install https://golang.github.io/dep/docs/installation.html")
-endif
-	dep ensure
 
 build: mac windows linux
 
 install: $(os) copy-$(os)
 
 dev: clean fmt install
+	go mod tidy
 
 copy-mac:
 	rm -f bin/terraform-provider-zerotier
@@ -64,11 +53,11 @@ copy-windows:
 		mv bin/terraform-provider-zerotier_$(TAG).exe "${APPDATA}/terraform.d/plugins/windows_amd64/"
 
 test: vet fmtcheck errcheck
-	TF_ACC=1 go test -v ./zerotier -run=TestAcczerotier -timeout=180m -parallel=4
+	TF_ACC=1 go test -v -run=TestAcczerotier -timeout=180m -parallel=4
 
 vet:
-	@echo "go tool vet $(VETARGS) ."
-	@go tool vet $(VETARGS) $$(ls -d */ | grep -v vendor) ; if [ $$? -eq 1 ]; then \
+	@echo "go vet $(VETARGS) ."
+	@go vet $(VETARGS); if [ $$? -eq 1 ]; then \
 		echo ""; \
 		echo "Vet found suspicious constructs. Please check the reported constructs"; \
 		echo "and fix them if necessary before submitting the code for review."; \
@@ -76,8 +65,8 @@ vet:
 	fi
 
 fmt:
-	gofmt -w $(GOFMT_FILES)
-	goimports -w $(GOFMT_FILES)
+	gofmt -s -w .
+	goimports -w .
 
 fmtcheck:
 	@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
@@ -88,21 +77,21 @@ errcheck:
 clean:
 	rm -rf bin/*
 
-mac: dep
-	GOOS=darwin GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG) ./zerotier
+mac:
+	GOOS=darwin GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG)
 	tar czvf bin/terraform-provider-zerotier_darwin-amd64_$(TAG).tgz bin/terraform-provider-zerotier_$(TAG)
 	rm -rf bin/terraform-provider-zerotier_$(TAG)
 
-windows: dep
+windows:
 ifndef HASZIP
 	$(error "zip is not available. If you're on windows, try `choco install zip`")
 endif
-	GOOS=windows GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG).exe ./zerotier
+	GOOS=windows GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG).exe
 	zip bin/terraform-provider-zerotier_windows-amd64_$(TAG).zip bin/terraform-provider-zerotier_$(TAG).exe
 	rm -rf bin/terraform-provider-zerotier_$(TAG).exe
 
-linux: dep
-	GOOS=linux GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG) ./zerotier
+linux:
+	GOOS=linux GOARCH=amd64 go build -o bin/terraform-provider-zerotier_$(TAG)
 	tar czvf bin/terraform-provider-zerotier_linux-amd64_$(TAG).tgz bin/terraform-provider-zerotier_$(TAG)
 	rm -rf bin/terraform-provider-zerotier_$(TAG)
 
