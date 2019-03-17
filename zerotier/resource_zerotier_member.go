@@ -66,8 +66,24 @@ func resourceZeroTierMember() *schema.Resource {
 			},
 			"ip_assignments": {
 				Type:        schema.TypeSet,
-				Description: "List of IP routed and assigned byt ZeroTier controller assignment pool. Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided.",
+				Description: "List of IP routed and assigned by ZeroTier controller assignment pool. Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided.",
 				Optional:    true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"ipv4_assignments": {
+				Type:        schema.TypeSet,
+				Description: "Computed list of IPv4 assigned by ZeroTier controller assignment pool. Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided.",
+				Computed:    true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"ipv6_assignments": {
+				Type:        schema.TypeSet,
+				Description: "Computed list of IPv6 assigned by ZeroTier controller assignment pool. Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided.",
+				Computed:    true,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
@@ -218,17 +234,32 @@ func buildIPV6(data string) (result string) {
 	return
 }
 
+// Calculate 6PLANE address for the member
 func sixPlaneAddress(d *schema.ResourceData) string {
 	nwid, nodeID := resourceNetworkAndNodeIdentifiers(d)
 	return buildIPV6("fd" + nwid + "9993" + nodeID)
 }
 
+// Calculate RFC4193 address for the member
 func rfc4193Address(d *schema.ResourceData) string {
 	nwid, nodeID := resourceNetworkAndNodeIdentifiers(d)
 	nwidInt, _ := strconv.ParseUint(nwid, 16, 64)
 	networkMask := uint32((nwidInt >> 32) ^ nwidInt)
 	networkPrefix := strconv.FormatUint(uint64(networkMask), 16)
 	return buildIPV6("fc" + networkPrefix + nodeID + "000000000001")
+}
+
+// Split the list of assigned IPs into IPv6 and IPv4 lists
+// Does not include 6PLANE or RFC4193, only those from the assignment pool
+func assingnedIpsGrouping(ipAssignments []string) (ipv4s []string, ipv6s []string) {
+	for _, element := range ipAssignments {
+		if strings.Contains(element, ":") {
+			ipv6s = append(ipv6s, element)
+		} else {
+			ipv4s = append(ipv4s, element)
+		}
+	}
+	return
 }
 
 func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
@@ -248,6 +279,8 @@ func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 		return nil
 	}
 
+	ipv4Assignments, ipv6Assignments := assingnedIpsGrouping(member.Config.IpAssignments)
+
 	d.SetId(member.Id)
 	d.Set("name", member.Name)
 	d.Set("description", member.Description)
@@ -259,6 +292,8 @@ func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("allow_ethernet_bridging", member.Config.ActiveBridge)
 	d.Set("no_auto_assign_ips", member.Config.NoAutoAssignIps)
 	d.Set("ip_assignments", member.Config.IpAssignments)
+	d.Set("ipv4_assignments", ipv4Assignments)
+	d.Set("ipv6_assignments", ipv6Assignments)
 	d.Set("rfc4193_address", rfc4193Address(d))
 	d.Set("6plane_address", sixPlaneAddress(d))
 	d.Set("capabilities", member.Config.Capabilities)
