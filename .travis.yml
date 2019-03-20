@@ -3,6 +3,10 @@ go:
   - "1.12"
 env:
   - GO111MODULE=on
+cache:
+  directories:
+    - $HOME/.cache/go-build
+    - $HOME/gopath/pkg/mod
 script:
   - make test
   - make clean
