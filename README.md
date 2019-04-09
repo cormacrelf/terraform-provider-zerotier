@@ -129,13 +129,13 @@ resource "zerotier_network" "your_network" {
     # Assign IPv4 addresses from the assignment_pool
     # auto_assign_v4 = true
 
-    # Effectively assign IPv6 RFC4193 (/128) for members of the network
+    # Effectively assign IPv6 using RFC4193 (/128 for each device)
     # auto_assign_rfc4193 = true
 
-    # Effectively assign IPv6 RFC4193 (/128) for members of the network
+    # Effectively assign IPv6 using ZeroTier's 6PLANE scheme (/80 routable for each device)
     # auto_assign_6plane = false
 
-    # Assing IPv6 addresses from the assignment_pool
+    # Assign IPv6 addresses from the assignment_pool
     # auto_assign_v6 = false
 
     # Multiple assignment pools allowed

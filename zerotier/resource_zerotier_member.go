@@ -79,7 +79,7 @@ func resourceZeroTierMember() *schema.Resource {
 			},
 			"6plane_address": {
 				Type:        schema.TypeString,
-				Description: "Computed 6PLANE (IPv6 /60) address. Always calculated and only actually assigned on the member if 6PLANE is configured on the network.",
+				Description: "Computed 6PLANE (IPv6 /80) address. Always calculated and only actually assigned on the member if 6PLANE is configured on the network.",
 				Computed:    true,
 			},
 			"capabilities": {
