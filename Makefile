@@ -43,7 +43,7 @@ copy-mac:
 copy-linux:
 	rm -f bin/terraform-provider-zerotier
 	mkdir -p "${HOME}/.terraform.d/plugins/linux_amd64"
-	tar -xvf bin/terraform-provider-zerotier_darwin-amd64_$(TAG).tgz && \
+	tar -xvf bin/terraform-provider-zerotier_linux-amd64_$(TAG).tgz && \
 		mv bin/terraform-provider-zerotier_$(TAG) "${HOME}/.terraform.d/plugins/linux_amd64/"
 
 copy-windows:
