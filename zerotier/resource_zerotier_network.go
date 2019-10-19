@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform/helper/validation"
 )
 
 func route() *schema.Resource {
@@ -64,6 +65,20 @@ func resourceZeroTierNetwork() *schema.Resource {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
+			},
+			//Warning: Undecoumented on the API, but that is how the UI manages it
+			"broadcast": &schema.Schema{
+				Type:        schema.TypeBool,
+				Description: "Enable network broadcast (ff:ff:ff:ff:ff:ff)",
+				Optional:    true,
+				Default:     true,
+			},
+			"multicast_limit": &schema.Schema{
+				Type:         schema.TypeInt,
+				Description:  "The maximum number of recipients that can receive an Ethernet multicast or broadcast. Setting to 0 disables multicast, but be aware that only IPv6 with NDP emulation (RFC4193 or 6PLANE addressing modes) or other unicast-only protocols will work without multicast.",
+				Optional:     true,
+				Default:      32,
+				ValidateFunc: validation.IntAtLeast(0),
 			},
 			"route": &schema.Schema{
 				Type:     schema.TypeList,
@@ -147,6 +162,8 @@ func fromResourceData(d *schema.ResourceData) (*Network, error) {
 		Config: &Config{
 			Name:              d.Get("name").(string),
 			Private:           d.Get("private").(bool),
+			EnableBroadcast:   d.Get("broadcast").(bool),
+			MulticastLimit:    d.Get("multicast_limit").(int),
 			V4AssignMode:      V4AssignModeConfig{ZT: true},
 			Routes:            routes,
 			IpAssignmentPools: pools,
@@ -189,6 +206,8 @@ func resourceNetworkRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("name", net.Config.Name)
 	d.Set("description", net.Description)
 	d.Set("private", net.Config.Private)
+	d.Set("broadcast", net.Config.EnableBroadcast)
+	d.Set("multicast_limit", net.Config.MulticastLimit)
 	d.Set("auto_assign_v4", net.Config.V4AssignMode.ZT)
 	d.Set("rules_source", net.RulesSource)
 
