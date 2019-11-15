@@ -65,11 +65,22 @@ func resourceZeroTierMember() *schema.Resource {
 				Default:  false,
 			},
 			"ip_assignments": {
-				Type:     schema.TypeList,
-				Optional: true,
+				Type:        schema.TypeSet,
+				Description: "List of IP routed and assigned byt ZeroTier controller assignment pool. Does not include RFC4193 nor 6PLANE addresses, only those from assignment pool or manually provided.",
+				Optional:    true,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
+			},
+			"rfc4193_address": {
+				Type:        schema.TypeString,
+				Description: "Computed RFC4193 (IPv6 /128) address. Always calculated and only actually assigned on the member if RFC4193 is configured on the network.",
+				Computed:    true,
+			},
+			"6plane_address": {
+				Type:        schema.TypeString,
+				Description: "Computed 6PLANE (IPv6 /80) address. Always calculated and only actually assigned on the member if 6PLANE is configured on the network.",
+				Computed:    true,
 			},
 			"capabilities": {
 				Type:     schema.TypeList,
@@ -152,7 +163,7 @@ func memberFromResourceData(d *schema.ResourceData) (*Member, error) {
 	for i := range capsRaw {
 		caps[i] = capsRaw[i].(int)
 	}
-	ipsRaw := d.Get("ip_assignments").([]interface{})
+	ipsRaw := d.Get("ip_assignments").(*schema.Set).List()
 	ips := make([]string, len(ipsRaw))
 	for i := range ipsRaw {
 		ips[i] = ipsRaw[i].(string)
@@ -193,6 +204,33 @@ func resourceNetworkAndNodeIdentifiers(d *schema.ResourceData) (string, string) 
 	return nwid, nodeID
 }
 
+// Receive a string and format every 4th element with a ":"
+func buildIPV6(data string) (result string) {
+	s := strings.SplitAfter(data, "")
+	end := len(s) - 1
+	result = ""
+	for i, s := range s {
+		result += s
+		if (i+1)%4 == 0 && i != end {
+			result += ":"
+		}
+	}
+	return
+}
+
+func sixPlaneAddress(d *schema.ResourceData) string {
+	nwid, nodeID := resourceNetworkAndNodeIdentifiers(d)
+	return buildIPV6("fd" + nwid + "9993" + nodeID)
+}
+
+func rfc4193Address(d *schema.ResourceData) string {
+	nwid, nodeID := resourceNetworkAndNodeIdentifiers(d)
+	nwidInt, _ := strconv.ParseUint(nwid, 16, 64)
+	networkMask := uint32((nwidInt >> 32) ^ nwidInt)
+	networkPrefix := strconv.FormatUint(uint64(networkMask), 16)
+	return buildIPV6("fc" + networkPrefix + nodeID + "000000000001")
+}
+
 func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 	client := m.(*ZeroTierClient)
 
@@ -221,6 +259,8 @@ func resourceMemberRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("allow_ethernet_bridging", member.Config.ActiveBridge)
 	d.Set("no_auto_assign_ips", member.Config.NoAutoAssignIps)
 	d.Set("ip_assignments", member.Config.IpAssignments)
+	d.Set("rfc4193_address", rfc4193Address(d))
+	d.Set("6plane_address", sixPlaneAddress(d))
 	d.Set("capabilities", member.Config.Capabilities)
 	setTags(d, member)
 

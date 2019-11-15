@@ -31,12 +31,19 @@ type V4AssignModeConfig struct {
 	ZT bool `json:"zt"`
 }
 
+type V6AssignModeConfig struct {
+	ZT       bool `json:"zt"`
+	SixPLANE bool `json:"6plane"`
+	RFC4193  bool `json:"rfc4193"`
+}
+
 type Config struct {
 	Name              string             `json:"name"`
 	Private           bool               `json:"private"`
 	Routes            []Route            `json:"routes"`
 	IpAssignmentPools []IpRange          `json:"ipAssignmentPools"`
 	V4AssignMode      V4AssignModeConfig `json:"v4AssignMode"`
+	V6AssignMode      V6AssignModeConfig `json:"v6AssignMode"`
 }
 
 type ConfigReadOnly struct {
